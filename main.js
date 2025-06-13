@@ -13,18 +13,35 @@ const scanType = process.argv[2];
 
 const row_header = `"player_id","version","name","full_name","description","image","height_cm","weight_kg","dob","positions","overall_rating","potential","value","wage","preferred_foot","weak_foot","skill_moves","international_reputation","work_rate","body_type","real_face","release_clause","specialities","club_id","club_name","club_league_id","club_league_name","club_logo","club_rating","club_position","club_kit_number","club_joined","club_contract_valid_until","country_id","country_name","country_league_id","country_league_name","country_flag","country_rating","country_position","country_kit_number","crossing","finishing","heading_accuracy","short_passing","volleys","dribbling","curve","fk_accuracy","long_passing","ball_control","acceleration","sprint_speed","agility","reactions","balance","shot_power","jumping","stamina","strength","long_shots","aggression","interceptions","positioning","vision","penalties","composure","defensive_awareness","standing_tackle","sliding_tackle","gk_diving","gk_handling","gk_kicking","gk_positioning","gk_reflexes","play_styles"\n`;
 
+const checkpointFile = './output/checkpoint.txt';
 async function download(fileToRead, fileToWrite) {
     const playerUrlList = fs.readFileSync(fileToRead).toString().trim().split('\n');
-    fs.writeFileSync(fileToWrite, row_header, {flag: 'w'});
+    if (!fs.existsSync(fileToWrite)) {
+        fs.writeFileSync(fileToWrite, row_header, { flag: 'w' });
+    }    
+    let lastIndex = -1;
+    if (fs.existsSync(checkpointFile)) {
+        const checkpointContent = fs.readFileSync(checkpointFile, 'utf-8');
+        lastIndex = parseInt(checkpointContent, 10);
+        if (isNaN(lastIndex)) lastIndex = -1;
+    }
 
     let count = 0;
     console.time('scan complete');
-    for (let url of playerUrlList) {
-        let row = await getPlayerDetailsCsvRow(url);
-        fs.writeFileSync(fileToWrite, row + '\n', {flag: 'a'});
-        console.log((++count) + '-' + url);
+    for (let i = lastIndex + 1; i < playerUrlList.length; i++) {
+        let url = playerUrlList[i];
+        try {
+            let row = await getPlayerDetailsCsvRow(url);
+            fs.writeFileSync(fileToWrite, row + '\n', {flag: 'a'});
+            fs.writeFileSync(checkpointFile, i.toString(), {flag: 'w'});
+            console.log((i + 1) + '-' + url);
+        } catch (err) {
+            console.error(`Erreur sur ${url}:`, err);
+            break;
+        }
     }
     console.timeEnd('scan complete');
+    if (fs.existsSync(checkpointFile)) fs.unlinkSync(checkpointFile);
 }
 
 (async function start() {
